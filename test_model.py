@@ -275,13 +275,20 @@ class TestMNISTModel(unittest.TestCase):
         print(f"   Predicciones únicas: {len(unique_predictions)} diferentes")
         print(f"   Las salidas varían: {predictions_vary}")
         
-        # Verificar que el modelo produce salidas variadas (no siempre la misma clase)
-        # o que hay margen entre clases
-        self.assertTrue(
-            len(unique_predictions) > 1 or avg_margin > 0.0,
-            f"El modelo produce salidas demasiado uniformes. "
-            f"Predicciones únicas: {len(unique_predictions)}, Margen: {avg_margin:.6f}"
-        )
+        # Verificar que el modelo produce salidas variadas
+        # Si solo hay 1 muestra, verificar que al menos las salidas varían dentro de esa muestra
+        if sample_size == 1:
+            self.assertTrue(
+                predictions_vary,
+                f"Con 1 sola muestra, el modelo debe producir salidas variadas dentro de los 10 logits"
+            )
+        else:
+            # Con múltiples muestras, verificar que produce predicciones diferentes o márgenes positivos
+            self.assertTrue(
+                len(unique_predictions) > 1 or avg_margin > 0.0,
+                f"El modelo produce salidas demasiado uniformes. "
+                f"Predicciones únicas: {len(unique_predictions)}, Margen: {avg_margin:.6f}"
+            )
         
         print(f"Test 6 PASADO: El modelo produce salidas razonables")
     
