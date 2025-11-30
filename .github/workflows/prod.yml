@@ -61,7 +61,7 @@ jobs:
           blob_service_client = BlobServiceClient.from_connection_string(connection_string)
           blob_client = blob_service_client.get_blob_client(
               container="modelos",
-              blob="mnist_model.onnx"
+              blob="mnist-12-int8.onnx"
           )
           
           with open("model.onnx", "wb") as f:
