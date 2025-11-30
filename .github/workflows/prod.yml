@@ -127,6 +127,14 @@ jobs:
       - name: Checkout código
         uses: actions/checkout@v4
       
+      - name: Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      
+      - name: Instalar azure-storage-blob
+        run: pip install azure-storage-blob
+      
       - name: Login a Azure Container Registry
         uses: docker/login-action@v3
         with:
@@ -139,15 +147,37 @@ jobs:
           echo "FULL_IMAGE_NAME=${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" >> $GITHUB_ENV
           echo "LATEST_IMAGE_NAME=${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:prod-latest" >> $GITHUB_ENV
           
-          # Construir URL del modelo en Azure Blob Storage
-          STORAGE_ACCOUNT="${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}"
-          CONTAINER_NAME="modelos"
-          BLOB_NAME="mnist-12-int8.onnx"
-          MODEL_URL="https://${STORAGE_ACCOUNT}.blob.core.windows.net/${CONTAINER_NAME}/${BLOB_NAME}"
-          echo "MODEL_URL=${MODEL_URL}" >> $GITHUB_ENV
+          # Generar URL del modelo con SAS token usando Python
+          python - <<EOF
+          import os
+          from datetime import datetime, timedelta
+          from azure.storage.blob import BlobServiceClient, generate_blob_sas, BlobSasPermissions
+          
+          storage_account_name = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
+          storage_account_key = os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
+          container_name = "modelos"
+          blob_name = "mnist-12-int8.onnx"
+          
+          # Generar SAS token válido por 1 hora
+          sas_token = generate_blob_sas(
+              account_name=storage_account_name,
+              container_name=container_name,
+              blob_name=blob_name,
+              account_key=storage_account_key,
+              permission=BlobSasPermissions(read=True),
+              expiry=datetime.utcnow() + timedelta(hours=1)
+          )
+          
+          model_url = f"https://{storage_account_name}.blob.core.windows.net/{container_name}/{blob_name}?{sas_token}"
+          
+          # Guardar en GITHUB_ENV
+          with open(os.getenv("GITHUB_ENV"), "a") as f:
+              f.write(f"MODEL_URL={model_url}\n")
+          
+          print(f"Modelo URL configurada con SAS token")
+          EOF
           
           echo "Imagen a construir: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
-          echo "Modelo ONNX: ${MODEL_URL}"
       
       - name: Construir imagen Docker
         run: |
