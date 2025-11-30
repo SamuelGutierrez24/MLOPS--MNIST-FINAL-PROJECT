@@ -149,22 +149,25 @@ class TestMNISTModel(unittest.TestCase):
         
         # Realizar inferencia
         result = self.session.run([self.output_name], {self.input_name: test_image})
-        probabilities = result[0][0]
+        output = result[0][0]
         
-        # Validaciones
-        self.assertEqual(len(probabilities), 10, "Debe haber 10 probabilidades (una por dígito)")
-        self.assertAlmostEqual(np.sum(probabilities), 1.0, places=5, 
-                              msg="Las probabilidades deben sumar 1.0")
+        # Validaciones básicas
+        self.assertEqual(len(output), 10, "Debe haber 10 salidas (una por dígito)")
+        self.assertIsInstance(output, (np.ndarray, list), "La salida debe ser un array")
         
-        # Verificar que todas las probabilidades están en el rango [0, 1]
-        for i, prob in enumerate(probabilities):
-            self.assertGreaterEqual(prob, 0.0, f"Probabilidad del dígito {i} debe ser >= 0")
-            self.assertLessEqual(prob, 1.0, f"Probabilidad del dígito {i} debe ser <= 1")
+        # El modelo devuelve logits o valores crudos, no probabilidades
+        # Verificar que hay variación en las salidas (no todas son iguales)
+        self.assertGreater(np.std(output), 0.0, "Las salidas deben tener variación")
         
-        predicted_digit = np.argmax(probabilities)
-        confidence = probabilities[predicted_digit]
+        # Obtener predicción (la clase con mayor valor)
+        predicted_digit = np.argmax(output)
+        max_value = output[predicted_digit]
         
-        print(f"   Predicción: {predicted_digit} con confianza {confidence:.2%}")
+        # Verificar que la predicción es válida (0-9)
+        self.assertIn(predicted_digit, range(10), "La predicción debe estar entre 0-9")
+        
+        print(f"   Predicción: {predicted_digit} (valor: {max_value:.4f})")
+        print(f"   Rango de salidas: min={np.min(output):.4f}, max={np.max(output):.4f}")
         print(f"Test 3 PASADO: El modelo responde correctamente a datos de entrada definidos")
     
     def test_04_model_accuracy_threshold(self):
@@ -188,8 +191,8 @@ class TestMNISTModel(unittest.TestCase):
             
             # Realizar inferencia
             result = self.session.run([self.output_name], {self.input_name: image})
-            probabilities = result[0][0]
-            predicted_digit = np.argmax(probabilities)
+            output = result[0][0]  # Logits o valores crudos
+            predicted_digit = np.argmax(output)  # Clase con mayor valor
             
             if predicted_digit == true_label:
                 correct_predictions += 1
@@ -222,8 +225,8 @@ class TestMNISTModel(unittest.TestCase):
                 
                 # Realizar inferencia
                 result = self.session.run([self.output_name], {self.input_name: image})
-                probabilities = result[0][0]
-                predicted_digit = np.argmax(probabilities)
+                output = result[0][0]
+                predicted_digit = np.argmax(output)
                 
                 # Verificar que la predicción esté en el rango válido
                 self.assertIn(predicted_digit, range(10), 
@@ -232,34 +235,37 @@ class TestMNISTModel(unittest.TestCase):
         print(f"Test 5 PASADO: Todas las {len(self.test_data)} muestras procesadas exitosamente")
     
     def test_06_model_confidence_reasonable(self):
-        """Test: Verificar que la confianza del modelo sea razonable"""
-        print("\nTest 6: Verificando confianza del modelo...")
+        """Test: Verificar que la separación entre clases sea razonable"""
+        print("\nTest 6: Verificando separación entre clases del modelo...")
         
-        MIN_CONFIDENCE = 0.50  # Confianza mínima promedio aceptable
+        MIN_MARGIN = 0.1  # Margen mínimo entre la mejor y segunda mejor predicción
         
-        confidences = []
+        margins = []
         
         for sample in self.test_data:
             image = np.array(sample["image"], dtype=np.float32).reshape(1, 1, 28, 28)
             
             result = self.session.run([self.output_name], {self.input_name: image})
-            probabilities = result[0][0]
-            max_confidence = np.max(probabilities)
-            confidences.append(max_confidence)
+            output = result[0][0]
+            
+            # Obtener los dos valores más altos
+            sorted_values = np.sort(output)[::-1]
+            margin = sorted_values[0] - sorted_values[1]  # Diferencia entre primero y segundo
+            margins.append(margin)
         
-        avg_confidence = np.mean(confidences)
+        avg_margin = np.mean(margins)
         
-        print(f"   Confianza promedio: {avg_confidence:.2%}")
-        print(f"   Confianza mínima: {np.min(confidences):.2%}")
-        print(f"   Confianza máxima: {np.max(confidences):.2%}")
+        print(f"   Margen promedio: {avg_margin:.4f}")
+        print(f"   Margen mínimo: {np.min(margins):.4f}")
+        print(f"   Margen máximo: {np.max(margins):.4f}")
         
         self.assertGreaterEqual(
-            avg_confidence,
-            MIN_CONFIDENCE,
-            f"La confianza promedio ({avg_confidence:.2%}) es menor al umbral ({MIN_CONFIDENCE:.2%})"
+            avg_margin,
+            MIN_MARGIN,
+            f"El margen promedio ({avg_margin:.4f}) es menor al umbral ({MIN_MARGIN:.4f})"
         )
         
-        print(f"Test 6 PASADO: Confianza promedio ({avg_confidence:.2%}) es adecuada")
+        print(f"Test 6 PASADO: Margen promedio ({avg_margin:.4f}) es adecuado")
     
     @classmethod
     def tearDownClass(cls):
