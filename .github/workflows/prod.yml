@@ -142,7 +142,7 @@ jobs:
           # Construir URL del modelo en Azure Blob Storage
           STORAGE_ACCOUNT="${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}"
           CONTAINER_NAME="modelos"
-          BLOB_NAME="mnist_model.onnx"
+          BLOB_NAME="mnist-12-int8.onnx"
           MODEL_URL="https://${STORAGE_ACCOUNT}.blob.core.windows.net/${CONTAINER_NAME}/${BLOB_NAME}"
           echo "MODEL_URL=${MODEL_URL}" >> $GITHUB_ENV
           
@@ -164,7 +164,7 @@ jobs:
           echo "Imagen construida exitosamente"
           docker images | grep ${{ env.IMAGE_NAME }}
       
-      - name: Escanear imagen (opcional)
+      - name: Escanear imagen
         run: |
           echo "Verificando imagen construida..."
           docker inspect ${{ env.FULL_IMAGE_NAME }}
