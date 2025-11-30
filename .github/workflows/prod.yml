@@ -36,7 +36,7 @@ jobs:
       
       - name: Instalar dependencias
         run: |
-          python -m pip --upgrade pip
+          python -m pip install --upgrade pip
           pip install onnxruntime numpy azure-storage-blob
       
       - name: Descargar modelo desde Azure Blob Storage
