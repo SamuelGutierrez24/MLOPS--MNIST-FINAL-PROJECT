@@ -59,7 +59,7 @@ class TestMNISTModel(unittest.TestCase):
             
             # Descargar modelo
             container_name = "modelos"
-            blob_name = "mnist_model.onnx"
+            blob_name = "mnist-12-int8.onnx"
             
             blob_client = blob_service_client.get_blob_client(
                 container=container_name,
