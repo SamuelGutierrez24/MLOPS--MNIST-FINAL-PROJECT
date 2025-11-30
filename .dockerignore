@@ -1,0 +1,79 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.code-workspace
+
+# Documentación
+docs/
+*.md
+!README.md
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Archivos de prueba/desarrollo
+test/
+tests/
+*.test.py
+sample_images/
+*.local
+.env.local
+.env.*.local
+
+# Node modules (si hay frontend)
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Modelo local (no incluir en build, se descarga)
+model.onnx
+*.onnx
+!app/model.onnx
+
+# Archivos de predicciones
+predicciones_*.txt

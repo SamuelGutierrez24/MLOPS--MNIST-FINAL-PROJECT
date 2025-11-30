@@ -205,3 +205,21 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ============================================
+# Project Specific - MNIST MLOps
+# ============================================
+# Modelo ONNX (no debe estar en el repositorio)
+*.onnx
+
+# Datos de prueba y predicciones
+mnist_test_samples.json
+predicciones_*.txt
+
+# Azure connection strings y secrets
+.azure/
+azure.env
+
+# Datos temporales de tests
+test_data/
+temp_model/

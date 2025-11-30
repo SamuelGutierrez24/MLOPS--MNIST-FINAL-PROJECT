@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  mnist-streamlit:
+    # Construir imagen localmente si no existe
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Proporcionar el MODEL_URL al construir
+        # Puede ser sobrescrito con: docker-compose build --build-arg MODEL_URL="https://..."
+        MODEL_URL: ${MODEL_URL:-}
+    
+    container_name: mnist-app
+    
+    # Puertos
+    ports:
+      - "8501:8501"
+    
+    # Variables de entorno
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-dev}
+      - AZURE_STORAGE_CONNECTION_STRING=${AZURE_STORAGE_CONNECTION_STRING:-}
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+      - PYTHONUNBUFFERED=1
+    
+    # Volúmenes para persistencia (opcional)
+    volumes:
+      # Guardar predicciones localmente
+      - ./predicciones:/app/predicciones
+      # Para desarrollo: compartir código fuente
+      # - ./app.py:/app/app.py
+      # - ./utils.py:/app/utils.py
+    
+    # Políticas de reinicio
+    restart: unless-stopped
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501').read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # Límites de recursos
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1.5G
+    
+    # Logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Redes (opcional, para varios servicios)
+    networks:
+      - mnist-network
+
+# Red personalizada
+networks:
+  mnist-network:
+    driver: bridge
+
+# Volúmenes nombrados (opcional)
+volumes:
+  predicciones:
+    driver: local

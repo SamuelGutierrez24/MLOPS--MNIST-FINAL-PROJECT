@@ -1,0 +1,26 @@
+# Configuración de Streamlit para ambiente de contenedor
+# Este archivo se copia al contenedor Docker para optimizar la aplicación
+
+[client]
+showErrorDetails = false
+toolbarMode = "viewer"
+logger.level = "info"
+
+[logger]
+level = "info"
+
+[server]
+port = 8501
+address = "0.0.0.0"
+enableCORS = false
+enableXsrfProtection = true
+headless = true
+runOnSave = false
+maxUploadSize = 200
+
+[theme]
+primaryColor = "#667eea"
+backgroundColor = "#f8f9fa"
+secondaryBackgroundColor = "#e9ecef"
+textColor = "#212529"
+font = "sans serif"

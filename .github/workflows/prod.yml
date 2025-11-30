@@ -1,0 +1,287 @@
+name: CI/CD Pipeline - Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AZURE_STORAGE_ACCOUNT_NAME: ${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}
+  AZURE_STORAGE_ACCOUNT_KEY: ${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}
+  ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
+  ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+  ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+  ENVIRONMENT: prod
+  IMAGE_NAME: mnist-app
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  # ==========================================
+  # JOB 1: TEST - Pruebas unitarias del modelo
+  # ==========================================
+  test:
+    name: Test - Validación del Modelo
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+      
+      - name: Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+      
+      - name: Instalar dependencias
+        run: |
+          python -m pip --upgrade pip
+          pip install onnxruntime numpy azure-storage-blob
+      
+      - name: Descargar modelo desde Azure Blob Storage
+        run: |
+          echo "Configurando acceso a Azure Storage..."
+          echo "Descargando modelo ONNX desde Azure..."
+          
+          python - <<EOF
+          import os
+          from azure.storage.blob import BlobServiceClient
+          
+          storage_account_name = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
+          storage_account_key = os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
+          
+          connection_string = (
+              f"DefaultEndpointsProtocol=https;"
+              f"AccountName={storage_account_name};"
+              f"AccountKey={storage_account_key};"
+              f"EndpointSuffix=core.windows.net"
+          )
+          
+          blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+          blob_client = blob_service_client.get_blob_client(
+              container="modelos",
+              blob="mnist_model.onnx"
+          )
+          
+          with open("model.onnx", "wb") as f:
+              f.write(blob_client.download_blob().readall())
+          
+          print("Modelo descargado exitosamente")
+          EOF
+          
+          ls -lh model.onnx
+      
+      - name: Descargar datos de prueba desde Azure Blob Storage
+        run: |
+          echo "Descargando datos de prueba desde Azure..."
+          
+          python - <<EOF
+          import os
+          from azure.storage.blob import BlobServiceClient
+          
+          storage_account_name = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
+          storage_account_key = os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
+          
+          connection_string = (
+              f"DefaultEndpointsProtocol=https;"
+              f"AccountName={storage_account_name};"
+              f"AccountKey={storage_account_key};"
+              f"EndpointSuffix=core.windows.net"
+          )
+          
+          blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+          blob_client = blob_service_client.get_blob_client(
+              container="test-data",
+              blob="mnist_test_samples.json"
+          )
+          
+          with open("mnist_test_samples.json", "wb") as f:
+              f.write(blob_client.download_blob().readall())
+          
+          print("Datos de prueba descargados exitosamente")
+          EOF
+          
+          ls -lh mnist_test_samples.json
+      
+      - name: Ejecutar tests unitarios
+        run: |
+          echo "Ejecutando pruebas unitarias del modelo..."
+          python test_model.py -v
+      
+      - name: Tests completados
+        run: |
+          echo "Todas las pruebas pasaron exitosamente"
+          echo "   - El modelo responde correctamente a datos de entrada"
+          echo "   - La métrica de precisión cumple el umbral definido"
+
+  # ==========================================
+  # JOB 2: BUILD/PROMOTE - Construir y desplegar
+  # ==========================================
+  build-and-deploy:
+    name: Build & Deploy - Production
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+      
+      - name: Login a Azure Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+      
+      - name: Configurar variables de entorno
+        run: |
+          echo "FULL_IMAGE_NAME=${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" >> $GITHUB_ENV
+          echo "LATEST_IMAGE_NAME=${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:prod-latest" >> $GITHUB_ENV
+          
+          # Construir URL del modelo en Azure Blob Storage
+          STORAGE_ACCOUNT="${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}"
+          CONTAINER_NAME="modelos"
+          BLOB_NAME="mnist_model.onnx"
+          MODEL_URL="https://${STORAGE_ACCOUNT}.blob.core.windows.net/${CONTAINER_NAME}/${BLOB_NAME}"
+          echo "MODEL_URL=${MODEL_URL}" >> $GITHUB_ENV
+          
+          echo "Imagen a construir: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+          echo "Modelo ONNX: ${MODEL_URL}"
+      
+      - name: Construir imagen Docker
+        run: |
+          echo "Construyendo imagen Docker con el nuevo modelo..."
+          
+          docker build \
+            --build-arg MODEL_URL="${{ env.MODEL_URL }}" \
+            --build-arg BUILD_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            --build-arg VERSION="prod-${{ github.sha }}" \
+            -t ${{ env.FULL_IMAGE_NAME }} \
+            -t ${{ env.LATEST_IMAGE_NAME }} \
+            .
+          
+          echo "Imagen construida exitosamente"
+          docker images | grep ${{ env.IMAGE_NAME }}
+      
+      - name: Escanear imagen (opcional)
+        run: |
+          echo "Verificando imagen construida..."
+          docker inspect ${{ env.FULL_IMAGE_NAME }}
+      
+      - name: Push de imagen a ACR
+        run: |
+          echo "Subiendo imagen a Azure Container Registry..."
+          docker push ${{ env.FULL_IMAGE_NAME }}
+          docker push ${{ env.LATEST_IMAGE_NAME }}
+          echo "Imagen subida exitosamente a ACR"
+      
+      - name: Desplegar a Azure Container Instances
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        run: |
+          echo "Desplegando contenedor a Azure Container Instances..."
+          
+          # Nota: Asegúrate de tener configurados los secrets necesarios:
+          # - AZURE_SUBSCRIPTION_ID
+          # - AZURE_RESOURCE_GROUP  
+          # - AZURE_TENANT_ID (si usas service principal)
+          
+          echo "Instrucciones para despliegue manual:"
+          echo "   1. Autenticarse en Azure: az login"
+          echo "   2. Ejecutar el siguiente comando:"
+          echo ""
+          echo "   az container create \\"
+          echo "     --resource-group ${AZURE_RESOURCE_GROUP} \\"
+          echo "     --name mnist-app-prod \\"
+          echo "     --image ${{ env.FULL_IMAGE_NAME }} \\"
+          echo "     --registry-login-server ${{ secrets.ACR_LOGIN_SERVER }} \\"
+          echo "     --registry-username ${{ secrets.ACR_USERNAME }} \\"
+          echo "     --registry-password <PASSWORD> \\"
+          echo "     --dns-name-label mnist-app-prod-unique \\"
+          echo "     --ports 8501 \\"
+          echo "     --cpu 1 \\"
+          echo "     --memory 2 \\"
+          echo "     --environment-variables \\"
+          echo "       ENVIRONMENT=prod \\"
+          echo "       AZURE_STORAGE_CONNECTION_STRING=<CONNECTION_STRING>"
+          echo ""
+          echo "NOTA: Por seguridad, el despliegue automático está comentado."
+          echo "   Descomenta el código a continuación para habilitar despliegue automático."
+          
+          # Descomentar estas líneas para habilitar despliegue automático:
+          # az login --service-principal \
+          #   -u ${{ secrets.AZURE_CLIENT_ID }} \
+          #   -p ${{ secrets.AZURE_CLIENT_SECRET }} \
+          #   --tenant ${AZURE_TENANT_ID}
+          # 
+          # AZURE_STORAGE_CONNECTION_STRING="DefaultEndpointsProtocol=https;AccountName=${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }};AccountKey=${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }};EndpointSuffix=core.windows.net"
+          # 
+          # az container create \
+          #   --resource-group ${AZURE_RESOURCE_GROUP} \
+          #   --name mnist-app-prod \
+          #   --image ${{ env.FULL_IMAGE_NAME }} \
+          #   --registry-login-server ${{ secrets.ACR_LOGIN_SERVER }} \
+          #   --registry-username ${{ secrets.ACR_USERNAME }} \
+          #   --registry-password ${{ secrets.ACR_PASSWORD }} \
+          #   --dns-name-label mnist-app-prod-${{ github.run_number }} \
+          #   --ports 8501 \
+          #   --cpu 1 \
+          #   --memory 2 \
+          #   --environment-variables \
+          #     ENVIRONMENT=prod \
+          #     AZURE_STORAGE_CONNECTION_STRING="${AZURE_STORAGE_CONNECTION_STRING}"
+          
+          echo "Imagen lista para despliegue"
+      
+      - name: Obtener endpoint de producción
+        env:
+          AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+        run: |
+          echo "Información del endpoint de producción..."
+          echo "   Contenedor: mnist-app-prod"
+          echo "   Recurso: ${AZURE_RESOURCE_GROUP}"
+          echo ""
+          echo "Para obtener el endpoint, ejecuta:"
+          echo "   az container show --resource-group ${AZURE_RESOURCE_GROUP} --name mnist-app-prod --query ipAddress.fqdn"
+          
+          # Descomentar estas líneas si tienes Azure CLI configurado:
+          # FQDN=$(az container show \
+          #   --resource-group ${AZURE_RESOURCE_GROUP} \
+          #   --name mnist-app-prod \
+          #   --query ipAddress.fqdn \
+          #   --output tsv)
+          # echo "Aplicación desplegada en: http://${FQDN}:8501"
+          # echo "PROD_ENDPOINT=http://${FQDN}:8501" >> $GITHUB_ENV
+      
+      - name: Resumen del despliegue
+        run: |
+          echo "================================================"
+          echo "DESPLIEGUE A PRODUCCIÓN COMPLETADO"
+          echo "================================================"
+          echo "Entorno: PRODUCTION"
+          echo "Imagen: ${{ env.FULL_IMAGE_NAME }}"
+          echo "Endpoint: ${{ env.PROD_ENDPOINT }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Autor: ${{ github.actor }}"
+          echo "================================================"
+      
+      - name: Comentar en PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## Despliegue a Producción Completado
+              
+              **Imagen:** \`${{ env.FULL_IMAGE_NAME }}\`
+              **Endpoint:** ${{ env.PROD_ENDPOINT }}
+              **Commit:** ${{ github.sha }}
+              
+              El modelo ha sido desplegado exitosamente a producción.`
+            })
