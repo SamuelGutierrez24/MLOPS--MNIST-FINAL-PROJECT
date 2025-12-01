@@ -49,20 +49,20 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip && \
 # ============================================
 # El modelo NO está en el repositorio, se descarga durante el build
 RUN if [ -z "$MODEL_URL" ]; then \
-        echo "❌ ERROR: MODEL_URL no está definido"; \
+        echo "ERROR: MODEL_URL no está definido"; \
         exit 1; \
     fi && \
-    echo "📥 Descargando modelo desde: $MODEL_URL" && \
+    echo "Descargando modelo desde: $MODEL_URL" && \
     wget --progress=bar:force:noscroll -O ${MODEL_PATH} "${MODEL_URL}" && \
     echo "✅ Modelo descargado exitosamente" && \
     ls -lh ${MODEL_PATH}
 
 # Verificar que el modelo se descargó correctamente
 RUN if [ ! -f ${MODEL_PATH} ]; then \
-        echo "❌ ERROR: El modelo no se descargó correctamente"; \
+        echo "ERROR: El modelo no se descargó correctamente"; \
         exit 1; \
     fi && \
-    echo "✅ Modelo verificado: $(du -h ${MODEL_PATH})"
+    echo "Modelo verificado: $(du -h ${MODEL_PATH})"
 
 # ============================================
 # PASO 4: Copiar código de la aplicación
