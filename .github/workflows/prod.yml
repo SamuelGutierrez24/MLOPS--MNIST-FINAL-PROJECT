@@ -12,9 +12,12 @@ env:
   ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
   ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
   ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+  AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
   ENVIRONMENT: prod
   IMAGE_NAME: mnist-app
   IMAGE_TAG: ${{ github.sha }}
+  CONTAINER_NAME: mnist-app-prod
+  DNS_LABEL: mnist-app-prod
 
 jobs:
   # ==========================================
@@ -41,7 +44,6 @@ jobs:
       
       - name: Descargar modelo desde Azure Blob Storage
         run: |
-          echo "Configurando acceso a Azure Storage..."
           echo "Descargando modelo ONNX desde Azure..."
           
           python - <<EOF
@@ -174,7 +176,7 @@ jobs:
           with open(os.getenv("GITHUB_ENV"), "a") as f:
               f.write(f"MODEL_URL={model_url}\n")
           
-          print(f"Modelo URL configurada con SAS token")
+          print("Modelo URL configurada con SAS token")
           EOF
           
           echo "Imagen a construir: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
@@ -206,85 +208,54 @@ jobs:
           docker push ${{ env.LATEST_IMAGE_NAME }}
           echo "Imagen subida exitosamente a ACR"
       
+      # ⭐ AQUÍ ESTÁ EL CAMBIO PRINCIPAL - OPCIÓN 1 SIMPLIFICADA
+      - name: Login a Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
       - name: Desplegar a Azure Container Instances
-        env:
-          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         run: |
           echo "Desplegando contenedor a Azure Container Instances..."
           
-          # Nota: Asegúrate de tener configurados los secrets necesarios:
-          # - AZURE_SUBSCRIPTION_ID
-          # - AZURE_RESOURCE_GROUP  
-          # - AZURE_TENANT_ID (si usas service principal)
+          # Construir connection string para Azure Storage
+          AZURE_STORAGE_CONNECTION_STRING="DefaultEndpointsProtocol=https;AccountName=${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }};AccountKey=${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }};EndpointSuffix=core.windows.net"
           
-          echo "Instrucciones para despliegue manual:"
-          echo "   1. Autenticarse en Azure: az login"
-          echo "   2. Ejecutar el siguiente comando:"
-          echo ""
-          echo "   az container create \\"
-          echo "     --resource-group ${AZURE_RESOURCE_GROUP} \\"
-          echo "     --name mnist-app-prod \\"
-          echo "     --image ${{ env.FULL_IMAGE_NAME }} \\"
-          echo "     --registry-login-server ${{ secrets.ACR_LOGIN_SERVER }} \\"
-          echo "     --registry-username ${{ secrets.ACR_USERNAME }} \\"
-          echo "     --registry-password <PASSWORD> \\"
-          echo "     --dns-name-label mnist-app-prod-unique \\"
-          echo "     --ports 8501 \\"
-          echo "     --cpu 1 \\"
-          echo "     --memory 2 \\"
-          echo "     --environment-variables \\"
-          echo "       ENVIRONMENT=prod \\"
-          echo "       AZURE_STORAGE_CONNECTION_STRING=<CONNECTION_STRING>"
-          echo ""
-          echo "NOTA: Por seguridad, el despliegue automático está comentado."
-          echo "   Descomenta el código a continuación para habilitar despliegue automático."
+          echo "Creando/Actualizando Azure Container Instance: ${{ env.CONTAINER_NAME }}"
           
-          # Descomentar estas líneas para habilitar despliegue automático:
-          # az login --service-principal \
-          #   -u ${{ secrets.AZURE_CLIENT_ID }} \
-          #   -p ${{ secrets.AZURE_CLIENT_SECRET }} \
-          #   --tenant ${AZURE_TENANT_ID}
-          # 
-          # AZURE_STORAGE_CONNECTION_STRING="DefaultEndpointsProtocol=https;AccountName=${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }};AccountKey=${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }};EndpointSuffix=core.windows.net"
-          # 
-          # az container create \
-          #   --resource-group ${AZURE_RESOURCE_GROUP} \
-          #   --name mnist-app-prod \
-          #   --image ${{ env.FULL_IMAGE_NAME }} \
-          #   --registry-login-server ${{ secrets.ACR_LOGIN_SERVER }} \
-          #   --registry-username ${{ secrets.ACR_USERNAME }} \
-          #   --registry-password ${{ secrets.ACR_PASSWORD }} \
-          #   --dns-name-label mnist-app-prod-${{ github.run_number }} \
-          #   --ports 8501 \
-          #   --cpu 1 \
-          #   --memory 2 \
-          #   --environment-variables \
-          #     ENVIRONMENT=prod \
-          #     AZURE_STORAGE_CONNECTION_STRING="${AZURE_STORAGE_CONNECTION_STRING}"
+          # ⭐ COMANDO SIMPLIFICADO - Crea o actualiza automáticamente
+          az container create \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --name ${{ env.CONTAINER_NAME }} \
+            --image ${{ env.FULL_IMAGE_NAME }} \
+            --registry-login-server ${{ secrets.ACR_LOGIN_SERVER }} \
+            --registry-username ${{ secrets.ACR_USERNAME }} \
+            --registry-password ${{ secrets.ACR_PASSWORD }} \
+            --dns-name-label ${{ env.DNS_LABEL }} \
+            --ports 8501 \
+            --cpu 1 \
+            --memory 2 \
+            --environment-variables \
+              ENVIRONMENT=${{ env.ENVIRONMENT }} \
+              AZURE_STORAGE_CONNECTION_STRING="${AZURE_STORAGE_CONNECTION_STRING}" \
+            --location eastus \
+            --output table
           
-          echo "Imagen lista para despliegue"
+          echo "Contenedor desplegado exitosamente"
       
       - name: Obtener endpoint de producción
-        env:
-          AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
         run: |
-          echo "Información del endpoint de producción..."
-          echo "   Contenedor: mnist-app-prod"
-          echo "   Recurso: ${AZURE_RESOURCE_GROUP}"
-          echo ""
-          echo "Para obtener el endpoint, ejecuta:"
-          echo "   az container show --resource-group ${AZURE_RESOURCE_GROUP} --name mnist-app-prod --query ipAddress.fqdn"
+          echo "Obteniendo información del endpoint..."
           
-          # Descomentar estas líneas si tienes Azure CLI configurado:
-          # FQDN=$(az container show \
-          #   --resource-group ${AZURE_RESOURCE_GROUP} \
-          #   --name mnist-app-prod \
-          #   --query ipAddress.fqdn \
-          #   --output tsv)
-          # echo "Aplicación desplegada en: http://${FQDN}:8501"
-          # echo "PROD_ENDPOINT=http://${FQDN}:8501" >> $GITHUB_ENV
+          FQDN=$(az container show \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --name ${{ env.CONTAINER_NAME }} \
+            --query ipAddress.fqdn \
+            --output tsv)
+          
+          echo "PROD_ENDPOINT=http://${FQDN}:8501" >> $GITHUB_ENV
+          
+          echo "Aplicación desplegada en: http://${FQDN}:8501"
       
       - name: Resumen del despliegue
         run: |
