@@ -100,7 +100,11 @@ def predict_digit(image_array):
         
         # Ejecutar inferencia
         result = session.run([output_name], {input_name: image_array})
-        probabilities = result[0][0]
+        logits = result[0][0]
+        
+        # Convertir logits a probabilidades usando softmax
+        exp_logits = np.exp(logits - np.max(logits))  # Restar max para estabilidad numérica
+        probabilities = exp_logits / np.sum(exp_logits)
         
         # Obtener predicción con mayor probabilidad
         predicted_digit = np.argmax(probabilities)

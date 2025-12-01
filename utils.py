@@ -45,15 +45,10 @@ def process_image(image: Image.Image, is_canvas: bool = False) -> tuple:
         else:
             img_array = image
         
-        # Si viene del canvas, necesitamos invertir los colores
-        # El canvas tiene fondo negro y trazo blanco
+        # Si viene del canvas, convertir a escala de grises si no lo es
         if is_canvas:
-            # Convertir a escala de grises si no lo es
             if len(img_array.shape) == 3:
                 img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY)
-            
-            # Invertir: el modelo espera fondo blanco y dígito negro
-            img_array = 255 - img_array
         
         # Redimensionar a 28x28
         img_resized = cv2.resize(img_array, (28, 28), interpolation=cv2.INTER_LINEAR)
@@ -62,18 +57,14 @@ def process_image(image: Image.Image, is_canvas: bool = False) -> tuple:
         img_display = img_resized.copy()
         
         # Normalizar a [0, 1]
+        # El modelo MNIST espera: fondo NEGRO (0.0) y dígito BLANCO (1.0)
         img_normalized = img_resized.astype('float32') / 255.0
-        
-        # Invertir si es necesario (algunos modelos esperan fondo blanco = 1, dígito negro = 0)
-        # Pero si ya está correctamente formateado, no hacer nada
-        # Intentar detectar si necesita inversión
-        if np.mean(img_normalized) < 0.3:  # Si es principalmente oscuro, invertir
-            img_normalized = 1.0 - img_normalized
         
         # Reshape a (1, 1, 28, 28) para batch_size=1, channels=1
         img_final = img_normalized.reshape(1, 1, 28, 28).astype('float32')
         
         logger.info(f"Imagen procesada exitosamente. Shape: {img_final.shape}, dtype: {img_final.dtype}")
+        logger.info(f"Rango de valores: min={img_final.min():.3f}, max={img_final.max():.3f}, mean={img_final.mean():.3f}")
         
         return img_final, img_display
     
