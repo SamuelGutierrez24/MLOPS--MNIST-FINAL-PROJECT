@@ -233,6 +233,7 @@ jobs:
             --registry-password ${{ secrets.ACR_PASSWORD }} \
             --dns-name-label ${{ env.DNS_LABEL }} \
             --ports 8501 \
+            --os-type Linux \
             --cpu 1 \
             --memory 2 \
             --environment-variables \
