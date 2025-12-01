@@ -14,11 +14,20 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Importar funciones auxiliares
-from src.utils import (
-    process_image,
-    log_prediction_to_azure,
-    get_latest_predictions
-)
+try:
+    # Intenta importar desde src (cuando se ejecuta localmente)
+    from src.utils import (
+        process_image,
+        log_prediction_to_azure,
+        get_latest_predictions
+    )
+except ModuleNotFoundError:
+    # Importa directamente (cuando se ejecuta en Docker)
+    from utils import (
+        process_image,
+        log_prediction_to_azure,
+        get_latest_predictions
+    )
 
 # Configurar página
 st.set_page_config(
