@@ -67,8 +67,8 @@ RUN if [ ! -f ${MODEL_PATH} ]; then \
 # ============================================
 # PASO 4: Copiar código de la aplicación
 # ============================================
-COPY app.py .
-COPY utils.py* ./
+COPY src/app.py .
+COPY src/utils.py* ./
 
 # ============================================
 # PASO 5: Limpiar para reducir tamaño de imagen

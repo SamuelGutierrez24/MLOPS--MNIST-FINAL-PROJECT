@@ -109,7 +109,7 @@ jobs:
       - name: Ejecutar tests unitarios
         run: |
           echo "Ejecutando pruebas unitarias del modelo..."
-          python test_model.py -v
+          python test/test_model.py -v
       
       - name: Tests completados
         run: |

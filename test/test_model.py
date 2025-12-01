@@ -254,7 +254,7 @@ class TestMNISTModel(unittest.TestCase):
             image = np.array(sample["image"], dtype=np.float32).reshape(1, 1, 28, 28)
             
             result = self.session.run([self.output_name], {self.input_name: image})
-            output = result[0][0]
+            output = result[0][0] # type: ignore
             
             predicted_digit = np.argmax(output)
             unique_predictions.add(int(predicted_digit))
