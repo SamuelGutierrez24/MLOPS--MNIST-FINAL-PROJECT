@@ -14,11 +14,20 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Importar funciones auxiliares
-from src.utils import (
-    process_image,
-    log_prediction_to_azure,
-    get_latest_predictions
-)
+try:
+    # Intenta importar desde src (cuando se ejecuta localmente)
+    from src.utils import (
+        process_image,
+        log_prediction_to_azure,
+        get_latest_predictions
+    )
+except ModuleNotFoundError:
+    # Importa directamente (cuando se ejecuta en Docker)
+    from utils import (
+        process_image,
+        log_prediction_to_azure,
+        get_latest_predictions
+    )
 
 # Configurar página
 st.set_page_config(
@@ -195,7 +204,7 @@ with col1:
         st.markdown("**Dibuja un dígito en el canvas:**")
         canvas_result = st_canvas(
             fill_color="white",
-            stroke_width=5,
+            stroke_width=30,
             stroke_color="white",
             background_color="black",
             height=CANVAS_HEIGHT,
@@ -249,7 +258,7 @@ if predict_button and image_for_prediction is not None:
             # Log de predicción en Azure
             timestamp = datetime.now().isoformat()
             environment = os.getenv("ENVIRONMENT", "dev")
-            confidence = float(probabilities[predicted_digit])
+            confidence = float(probabilities[predicted_digit]) # pyright: ignore[reportOptionalSubscript] 
             
             log_prediction_to_azure(
                 timestamp=timestamp,
@@ -299,10 +308,9 @@ if "predicted_digit" in st.session_state and st.session_state.predicted_digit is
         
         st.markdown(f"""
         <div class="confidence-display">
-        Confianza: {st.session_state.probabilities[st.session_state.predicted_digit]:.2%}
+        Confianza: {st.session_state.probabilities[st.session_state.predicted_digit]:.2%} 
         </div>
         """, unsafe_allow_html=True)
-    
     # Gráfico de barras con todas las probabilidades
     st.markdown("**Probabilidades por dígito:**")
     

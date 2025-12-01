@@ -103,7 +103,7 @@ def log_prediction_to_azure(
         blob_service_client = BlobServiceClient.from_connection_string(connection_string)
         
         # Nombre del contenedor y blob
-        container_name = "mnist-predictions"
+        container_name = "predicciones"
         blob_name = f"predicciones_{environment}.txt"
         
         # Obtener referencia al contenedor (crear si no existe)
