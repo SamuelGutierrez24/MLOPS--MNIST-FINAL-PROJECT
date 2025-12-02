@@ -49,9 +49,16 @@ def process_image(image: Image.Image, is_canvas: bool = False) -> tuple:
         if is_canvas:
             if len(img_array.shape) == 3:
                 img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY)
+        else:
+            # Para imágenes subidas, verificar si necesitamos invertir
+            # El modelo espera fondo NEGRO y dígito BLANCO
+            # Si la imagen es mayormente clara (fondo blanco), invertimos
+            if img_array.mean() > 127:
+                img_array = 255 - img_array
         
         # Redimensionar a 28x28
-        img_resized = cv2.resize(img_array, (28, 28), interpolation=cv2.INTER_LINEAR)
+        # Usar INTER_AREA es mejor para reducir tamaño (shrinking)
+        img_resized = cv2.resize(img_array, (28, 28), interpolation=cv2.INTER_AREA)
         
         # Guardar copia para visualización
         img_display = img_resized.copy()

@@ -39,6 +39,13 @@ st.set_page_config(
 
 # Variables de configuración
 MODEL_PATH = "/app/model.onnx"
+# Fallback para desarrollo local
+if not os.path.exists(MODEL_PATH):
+    if os.path.exists("model.onnx"):
+        MODEL_PATH = "model.onnx"
+    elif os.path.exists("src/model.onnx"):
+        MODEL_PATH = "src/model.onnx"
+
 CANVAS_WIDTH = 300
 CANVAS_HEIGHT = 300
 
