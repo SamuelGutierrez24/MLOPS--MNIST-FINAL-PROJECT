@@ -198,7 +198,7 @@ with col1:
         st.markdown("**Dibuja un dígito en el canvas:**")
         canvas_result = st_canvas(
             fill_color="white",
-            stroke_width=30,
+            stroke_width=27,
             stroke_color="white",
             background_color="black",
             height=CANVAS_HEIGHT,
