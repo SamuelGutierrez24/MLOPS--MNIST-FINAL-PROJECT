@@ -115,7 +115,6 @@ class TestMNISTModel(unittest.TestCase):
             raise
     
     def test_01_model_loads_successfully(self):
-        """Test: Verificar que el modelo se carga correctamente"""
         print("\nTest 1: Verificando carga del modelo...")
         
         self.assertIsNotNone(self.session, "El modelo no se cargó correctamente")
@@ -125,47 +124,36 @@ class TestMNISTModel(unittest.TestCase):
         print("Test 1 PASADO: Modelo cargado correctamente")
     
     def test_02_model_input_shape(self):
-        """Test: Verificar que el modelo tenga la forma de entrada correcta"""
         print("\nTest 2: Verificando forma de entrada del modelo...")
         
         input_shape = self.session.get_inputs()[0].shape
         expected_shape = [1, 1, 28, 28]
         
-        # Comparar dimensiones (ignorar batch size dinámico)
         self.assertEqual(input_shape[1:], expected_shape[1:], 
                         f"La forma de entrada debe ser {expected_shape}, pero es {input_shape}")
         
         print(f"Test 2 PASADO: Forma de entrada correcta: {input_shape}")
     
     def test_03_model_responds_with_defined_input(self):
-        """
-        Test REQUERIDO 1: Probar que el modelo responde con datos de entrada definidos
-        """
         print("\nTest 3: Probando respuesta del modelo con datos de entrada definidos...")
         
-        # Usar la primera muestra de los datos de prueba reales
         test_sample = self.test_data[0]
         test_image = np.array(test_sample["image"], dtype=np.float32).reshape(1, 1, 28, 28)
         expected_label = test_sample["label"]
         
         print(f"   Usando muestra con label esperado: {expected_label}")
         
-        # Realizar inferencia
         result = self.session.run([self.output_name], {self.input_name: test_image})
-        output = result[0][0]  # Logits antes de softmax
+        output = result[0][0]
         
-        # Validaciones básicas
         self.assertEqual(len(output), 10, "Debe haber 10 salidas (una por dígito)")
         self.assertIsInstance(output, (np.ndarray, list), "La salida debe ser un array")
         
-        # Obtener predicción (la clase con mayor valor logit)
         predicted_digit = np.argmax(output)
         max_logit = output[predicted_digit]
         
-        # Verificar que la predicción es válida (0-9)
         self.assertIn(predicted_digit, range(10), "La predicción debe estar entre 0-9")
         
-        # Verificar que no todos los logits son iguales (el modelo está funcionando)
         unique_values = len(np.unique(output))
         self.assertGreater(unique_values, 1, "El modelo debe producir salidas variadas")
         
@@ -175,41 +163,31 @@ class TestMNISTModel(unittest.TestCase):
         print(f"Test 3 PASADO: El modelo responde correctamente a datos de entrada definidos")
     
     def test_04_model_accuracy_threshold(self):
-        """
-        Test REQUERIDO 2: Probar que no existe un cambio significativo en alguna métrica definida
-        
-        Métrica: Precisión (accuracy) >= 85% en datos de prueba
-        """
         print("\nTest 4: Verificando precisión del modelo con datos de prueba...")
         
-        # Umbral de precisión mínimo aceptable
         ACCURACY_THRESHOLD = 0.85
         
         correct_predictions = 0
         total_predictions = 0
         
         for sample in self.test_data:
-            # Convertir imagen de prueba a formato correcto
             image = np.array(sample["image"], dtype=np.float32).reshape(1, 1, 28, 28)
             true_label = sample["label"]
             
-            # Realizar inferencia
             result = self.session.run([self.output_name], {self.input_name: image})
-            output = result[0][0]  # Logits o valores crudos
-            predicted_digit = np.argmax(output)  # Clase con mayor valor
+            output = result[0][0]
+            predicted_digit = np.argmax(output)
             
             if predicted_digit == true_label:
                 correct_predictions += 1
             total_predictions += 1
         
-        # Calcular precisión
         accuracy = correct_predictions / total_predictions
         
         print(f"   Predicciones correctas: {correct_predictions}/{total_predictions}")
         print(f"   Precisión del modelo: {accuracy:.2%}")
         print(f"   Umbral mínimo requerido: {ACCURACY_THRESHOLD:.2%}")
         
-        # Validar que la precisión no sea menor al umbral
         self.assertGreaterEqual(
             accuracy, 
             ACCURACY_THRESHOLD,

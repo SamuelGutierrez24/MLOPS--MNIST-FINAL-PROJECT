@@ -81,7 +81,6 @@ st.markdown("""
 # Cargar modelo ONNX en caché
 @st.cache_resource
 def load_model():
-    """Cargar el modelo ONNX y cacharlo para evitar recargas"""
     try:
         if not os.path.exists(MODEL_PATH):
             st.error(f" Modelo no encontrado en {MODEL_PATH}")
@@ -97,25 +96,20 @@ def load_model():
 
 # Función para hacer predicción
 def predict_digit(image_array):
-    """Realizar predicción con el modelo ONNX"""
     try:
         session = load_model()
         if session is None:
             return None, None
         
-        # Obtener nombres de entrada y salida
         input_name = session.get_inputs()[0].name
         output_name = session.get_outputs()[0].name
         
-        # Ejecutar inferencia
         result = session.run([output_name], {input_name: image_array})
         logits = result[0][0]
         
-        # Convertir logits a probabilidades usando softmax
-        exp_logits = np.exp(logits - np.max(logits))  # Restar max para estabilidad numérica
+        exp_logits = np.exp(logits - np.max(logits))
         probabilities = exp_logits / np.sum(exp_logits)
         
-        # Obtener predicción con mayor probabilidad
         predicted_digit = np.argmax(probabilities)
         confidence = probabilities[predicted_digit]
         
@@ -349,8 +343,3 @@ if "predicted_digit" in st.session_state and st.session_state.predicted_digit is
 
 # Footer
 st.markdown("---")
-st.markdown("""
-<div style="text-align: center; color: gray; margin-top: 30px;">
-    <small>Aplicación MNIST - Reconocimiento de Dígitos | Versión 1.0 | Powered by Streamlit + ONNX</small>
-</div>
-""", unsafe_allow_html=True)
