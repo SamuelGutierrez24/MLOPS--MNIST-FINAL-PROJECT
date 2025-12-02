@@ -20,9 +20,7 @@ env:
   DNS_LABEL: mnist-app-dev
 
 jobs:
-  # ==========================================
   # JOB 1: TEST - Pruebas unitarias del modelo
-  # ==========================================
   test:
     name: Test - Validación del Modelo
     runs-on: ubuntu-latest
@@ -117,9 +115,7 @@ jobs:
           echo "   - El modelo responde correctamente a datos de entrada"
           echo "   - La métrica de precisión cumple el umbral definido"
 
-  # ==========================================
   # JOB 2: BUILD/PROMOTE - Construir y desplegar
-  # ==========================================
   build-and-deploy:
     name: Build & Deploy - Development
     runs-on: ubuntu-latest

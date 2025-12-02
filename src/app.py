@@ -15,14 +15,12 @@ logger = logging.getLogger(__name__)
 
 # Importar funciones auxiliares
 try:
-    # Intenta importar desde src (cuando se ejecuta localmente)
     from src.utils import (
         process_image,
         log_prediction_to_azure,
         get_latest_predictions
     )
 except ModuleNotFoundError:
-    # Importa directamente (cuando se ejecuta en Docker)
     from utils import (
         process_image,
         log_prediction_to_azure,
@@ -39,7 +37,6 @@ st.set_page_config(
 
 # Variables de configuración
 MODEL_PATH = "/app/model.onnx"
-# Fallback para desarrollo local
 if not os.path.exists(MODEL_PATH):
     if os.path.exists("model.onnx"):
         MODEL_PATH = "model.onnx"
@@ -88,7 +85,6 @@ st.markdown("""
 # Cargar modelo ONNX en caché
 @st.cache_resource
 def load_model():
-    """Cargar el modelo ONNX y cacharlo para evitar recargas"""
     try:
         if not os.path.exists(MODEL_PATH):
             st.error(f" Modelo no encontrado en {MODEL_PATH}")
@@ -104,25 +100,20 @@ def load_model():
 
 # Función para hacer predicción
 def predict_digit(image_array):
-    """Realizar predicción con el modelo ONNX"""
     try:
         session = load_model()
         if session is None:
             return None, None
         
-        # Obtener nombres de entrada y salida
         input_name = session.get_inputs()[0].name
         output_name = session.get_outputs()[0].name
         
-        # Ejecutar inferencia
         result = session.run([output_name], {input_name: image_array})
         logits = result[0][0]
         
-        # Convertir logits a probabilidades usando softmax
-        exp_logits = np.exp(logits - np.max(logits))  # Restar max para estabilidad numérica
+        exp_logits = np.exp(logits - np.max(logits))
         probabilities = exp_logits / np.sum(exp_logits)
         
-        # Obtener predicción con mayor probabilidad
         predicted_digit = np.argmax(probabilities)
         confidence = probabilities[predicted_digit]
         
@@ -211,7 +202,7 @@ with col1:
         st.markdown("**Dibuja un dígito en el canvas:**")
         canvas_result = st_canvas(
             fill_color="white",
-            stroke_width=30,
+            stroke_width=25,
             stroke_color="white",
             background_color="black",
             height=CANVAS_HEIGHT,
