@@ -348,8 +348,3 @@ if "predicted_digit" in st.session_state and st.session_state.predicted_digit is
 
 # Footer
 st.markdown("---")
-st.markdown("""
-<div style="text-align: center; color: gray; margin-top: 30px;">
-    <small>Aplicación MNIST - Reconocimiento de Dígitos | Versión 1.0 | Powered by Streamlit + ONNX</small>
-</div>
-""", unsafe_allow_html=True)
